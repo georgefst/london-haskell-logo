@@ -8,10 +8,10 @@ stationCircle = joinedStations . pure
 joinedStations :: [Point V2 Double] -> Diagram SVG
 joinedStations points = 
     let trail = fromVertices points
-    in  atPoints points (repeat (circle 2 # fc white # lw 0))
-            <> (trail # lc white # lw 1)
-            <> atPoints points (repeat (circle 3 # fc black # lw 0))
-            <> trail # lc black # lw 3
+    in  atPoints points (repeat (circle 2 # fc white # lwG 0))
+            <> (trail # lc white # lwG 1)
+            <> atPoints points (repeat (circle 3 # fc black # lwG 0))
+            <> trail # lc black # lwG 3
 
 circleLine = 
     lc (sRGB24 255 211 0)
@@ -48,22 +48,22 @@ lambdaTube = mconcat
     [ joinedStations [zero, p2 (6, 6)]
     , stationCircle $ p2 (12, 0)
     , stationCircle $ p2 (18, (-6))
-    , leg # lw 2 # victoriaLine
-    , leg # reflectY # lw 2 # victoriaLine
-    , leg # translate (12 *^ unit _x) # lw 2 # bakerlooLine
-    , leg # reflectY # reflectX # translate (12 *^ unit _x) # lw 2 # bakerlooLine
-    , leg # reflectY # translate (12 *^ unit _x) # lw 2 # centralLine
-    , horizontalA # stroke # lw 2 # hammersmithAndCityLine # upperLine 
-    , horizontalA # stroke # lw 2 # circleLine # lowerLine
-    , horizontalB # stroke # lw 2 # districtLine # lowerLine 
-    , horizontalB # stroke # lw 2 # circleLine # upperLine
+    , leg # lwG 2 # victoriaLine
+    , leg # reflectY # lwG 2 # victoriaLine
+    , leg # translate (12 *^ unit _x) # lwG 2 # bakerlooLine
+    , leg # reflectY # reflectX # translate (12 *^ unit _x) # lwG 2 # bakerlooLine
+    , leg # reflectY # translate (12 *^ unit _x) # lwG 2 # centralLine
+    , horizontalA # stroke # lwG 2 # hammersmithAndCityLine # upperLine 
+    , horizontalA # stroke # lwG 2 # circleLine # lowerLine
+    , horizontalB # stroke # lwG 2 # districtLine # lowerLine 
+    , horizontalB # stroke # lwG 2 # circleLine # upperLine
     ]
     # center
 
 logoName = 
     text "London Haskell"
         # font "P22 Johnston Underground"
-        # fontSize 8
+        # fontSizeG 8
         # fc (sRGB24 0 54 136)
 
 
