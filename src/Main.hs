@@ -1,11 +1,21 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
+
 module Main (main) where
 
+import Diagrams.Prelude hiding (font)
+import Diagrams.Backend.SVG (renderSVG)
 import Diagrams.Prelude
-import Diagrams.Backend.SVG.CmdLine
+import DiagramsWaterfall
+import Waterfall qualified as W
 
 stationCircle = joinedStations . pure
 
-joinedStations :: [Point V2 Double] -> Diagram SVG
+joinedStations :: _ => [Point V2 Double] -> Diagram b
 joinedStations points = 
     let trail = fromVertices points
     in  atPoints points (repeat (circle 2 # fc white # lwG 0))
@@ -67,8 +77,15 @@ logoName =
         # fc (sRGB24 0 54 136)
 
 
-
-main :: IO ()
-main = mainWith $ 
+diag =
     (vsep 12 [lambdaTube, logoName])
     # pad 1.5
+
+main = do
+    renderSVG "logo.svg" (mkSizeSpec $ V2 Nothing (Just 72)) diag
+    globalFont <- W.fontFromPath "P22 Johnston Underground Regular.ttf" 8
+    W.writeOBJ 0.1 "logo.obj" $
+        renderDia
+            Waterfall
+            WaterfallOptions{globalFont, prismLength = 5}
+            diag
