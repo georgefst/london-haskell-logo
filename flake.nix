@@ -25,7 +25,7 @@
                 pkgs.writeText "process-compose.yaml" (builtins.toJSON {
                   processes = {
                     ghcid.command = "ghcid -W -r";
-                    f3d.command = "f3d --watch logo.glb --light-intensity 4 --background-color black";
+                    f3d.command = "f3d --watch logo.step --light-intensity 4 --background-color black -s --coloring-by-cells --coloring-component=-2";
                   };
                 })
               }

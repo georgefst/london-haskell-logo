@@ -93,7 +93,7 @@ diag =
 main = do
     -- renderSVG "logo.svg" (mkSizeSpec $ V2 Nothing (Just 72)) diag
     globalFont <- W.fontFromPath "P22 Johnston Underground Regular.ttf" 8
-    W.writeSolid 0.1 "logo.glb" $
+    W.writeSolid 0.1 "logo.step" $
         renderWaterfall
             globalFont
             -- $ mconcat
