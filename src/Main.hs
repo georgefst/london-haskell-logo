@@ -94,9 +94,8 @@ main = do
     -- renderSVG "logo.svg" (mkSizeSpec $ V2 Nothing (Just 72)) diag
     globalFont <- W.fontFromPath "P22 Johnston Underground Regular.ttf" 8
     W.writeOBJ 0.1 "logo.obj" $
-        renderDia
-            Waterfall
-            WaterfallOptions{globalFont}
+        renderWaterfall
+            globalFont
             -- $ mconcat
             --     [ cube & skin & scale 10 & sc blue & translateX 5
             --     , cube & skin & scale 10 & sc red & translateZ -20 & translateX 5

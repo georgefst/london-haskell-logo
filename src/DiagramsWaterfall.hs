@@ -19,6 +19,7 @@
 
 -- | A Diagrams backend for Waterfall CAD.
 module DiagramsWaterfall (
+    renderWaterfall,
     B,
     Waterfall (Waterfall),
     Options (WaterfallOptions, globalFont),
@@ -41,6 +42,9 @@ import Diagrams.TwoD.Offset
 import Diagrams.TwoD.Text
 import Linear
 import Waterfall qualified as W
+
+renderWaterfall :: W.Font -> Diagram (Waterfall V3) -> W.Solid
+renderWaterfall globalFont = renderDia Waterfall WaterfallOptions{globalFont}
 
 -- TODO parameterise this by a monad so that we can have an optional pure renderer, and only need IO for text?
 -- i.e. have pretty much everything work for any monad, but then only `instance Renderable (Text Double) (Waterfall IO)`
@@ -159,8 +163,6 @@ colourToPaint c = W.paintWithColour (W.Colour r g b)
 
 -- TODO is there a better API than parameterising the backend type and creating entire 2D Diagrams?
 -- e.g. would it be better to just make all of the primitives renderable directly in 3D?
--- if the current approach is the way we want to go, we should at least provide helpers like:
--- `renderWaterfall2D :: W.Font -> Double -> Diagram (Waterfall V2) -> W.Solid`
 -- TODO also is there a better name for this?
 -- it seems somewhat standard, but then there are identifers in Diagrams using that word quite differently
 -- I'd be happy to just use Prism, but that clashes with Diagrams' lens re-exports
