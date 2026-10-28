@@ -87,7 +87,7 @@ logoName =
         # fc (sRGB24 0 54 136)
 
 diag =
-    (atPoints [0, p3 (0, -14, 4)] [lambdaTube, logoName # extrude 0.5])
+    (atPoints [0, p3 (0, -14, 1)] [lambdaTube, logoName # extrude 0.5])
     # pad 1.5
 
 main = do
