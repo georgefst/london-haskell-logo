@@ -68,6 +68,8 @@ instance Backend (Waterfall v) v Double where
             RPrim p -> (unRender $ render Waterfall p) opts sty
             _ -> mempty
 
+-- TODO is there a way to retain information about richer shapes, e.g. turn circles directly in to circles?
+-- probably not currently: https://github.com/diagrams/diagrams-svg/issues/121
 instance Renderable (Path V2 Double) (Waterfall V2) where
     render Waterfall path = Render \opts sty -> mconcat do
         trail <- pathTrails path
