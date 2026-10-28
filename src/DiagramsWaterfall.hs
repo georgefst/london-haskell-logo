@@ -3,9 +3,10 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE NoFieldSelectors #-}
 
 -- TODO very WIP
 -- heavily based on my Gloss backend, as well as the SVG backend
@@ -13,11 +14,12 @@
 -- not widely tested - only really on London Haskell logo
 -- see various TODOs below
 
--- | A Diagrams backend for Waterfall CAD. Turns shapes in to prisms.
+-- | A Diagrams backend for Waterfall CAD.
 module DiagramsWaterfall (
     B,
     Waterfall (Waterfall),
     Options (WaterfallOptions, globalFont, prismLength),
+    extrude,
 ) where
 
 import Control.Monad
@@ -25,8 +27,10 @@ import Control.Monad.Zip
 import Data.Colour qualified
 import Data.Foldable
 import Data.Function
+import Data.Kind
 import Data.Maybe
 import Data.Tree
+import Data.Typeable
 import Diagrams.Core.Compile
 import Diagrams.Prelude
 import Diagrams.TwoD.Offset
@@ -36,20 +40,18 @@ import Waterfall qualified as W
 -- TODO parameterise this by a monad so that we can have an optional pure renderer, and only need IO for text?
 -- i.e. have pretty much everything work for any monad, but then only `instance Renderable (Text Double) (Waterfall IO)`
 -- for now we just have a pure renderer which requires a single font to be passed in up front and used everywhere
-data Waterfall = Waterfall
-type B = Waterfall
+data Waterfall (v :: Type -> Type) = Waterfall
+type B = Waterfall V3
 
--- TODO proper 3D backend, instead of a 2D one which we just end up using to create prisms?
--- unclear how much support Diagrams really has
-type instance V Waterfall = V2
-type instance N Waterfall = Double
+type instance V (Waterfall v) = v
+type instance N (Waterfall v) = Double
 
-instance Backend Waterfall V2 Double where
-    type Result Waterfall V2 Double = W.Solid
-    newtype Render Waterfall V2 Double = Render
-        { unwrap :: Options Waterfall V2 Double -> Style V2 Double -> Result Waterfall V2 Double
+instance Backend (Waterfall v) v Double where
+    type Result (Waterfall v) v Double = W.Solid
+    newtype Render (Waterfall v) v Double = Render
+        { unRender :: Options (Waterfall v) v Double -> Style v Double -> Result (Waterfall v) v Double
         }
-    data Options Waterfall V2 Double = WaterfallOptions
+    data Options (Waterfall v) v Double = WaterfallOptions
         { globalFont :: W.Font -- TODO temporary crutch - see above about fonts and pure rendering
         , prismLength :: Double
         }
@@ -61,10 +63,10 @@ instance Backend Waterfall V2 Double where
             RStyle s -> Just s
             _ -> Nothing
         prim sty = \case
-            RPrim p -> (render Waterfall p).unwrap opts sty
+            RPrim p -> (unRender $ render Waterfall p) opts sty
             _ -> mempty
 
-instance Renderable (Path V2 Double) Waterfall where
+instance Renderable (Path V2 Double) (Waterfall V2) where
     render Waterfall path = Render \opts sty -> mconcat do
         trail <- pathTrails path
         guard $ not $ isTrailEmpty $ unLoc trail -- prevents segfault
@@ -89,16 +91,38 @@ instance Renderable (Path V2 Double) Waterfall where
                     )
                 $ fixTrail trail
 
--- TODO stop ignoring text alignment, rotations, non-colour styles etc.
-instance Renderable (Text Double) Waterfall where
+-- TODO stop ignoring text alignment, non-colour styles etc.
+instance Renderable (Text Double) (Waterfall V2) where
     render Waterfall (Text tt _ s) = Render \opts sty -> mconcat do
         c <- maybeToList $ getFillColour sty
         pure
             . toColouredPrism opts.prismLength c
-            . W.translate2D (unP $ papply tt 0)
-            . W.scale2D (apply tt 1)
+            . convertTransform2D tt
             $ W.text opts.globalFont s
 
+-- TODO add:
+-- Path V3 Double
+-- CSG Double
+-- all other 3D shapes from https://hackage-content.haskell.org/package/diagrams-lib/docs/Diagrams-ThreeD-Shapes.html
+instance Renderable (Ellipsoid Double) (Waterfall V3) where
+    render Waterfall (Ellipsoid t) = Render \_ sty ->
+        maybe id convertColour (getSurfaceColour sty) $ convertTransform t W.unitSphere
+instance Renderable (Box Double) (Waterfall V3) where
+    render Waterfall (Box t) = Render \_ sty ->
+        maybe id convertColour (getSurfaceColour sty) $ convertTransform t $ W.box 1
+instance Renderable (Frustum Double) (Waterfall V3) where
+    render Waterfall (Frustum _ _ t) = Render \_ sty ->
+        -- TODO handle properly (solid of revolution?), rather than assuming everything is a unit cylinder
+        maybe id convertColour (getSurfaceColour sty) $ convertTransform t $ W.unitCylinder
+
+-- TODO stop ignoring rotations etc.
+convertTransform :: Transformation V3 Double -> W.Solid -> W.Solid
+convertTransform t = W.translate (unP $ papply t 0) . W.scale (apply t 1)
+convertTransform2D :: Transformation V2 Double -> W.Shape -> W.Shape
+convertTransform2D t = W.translate2D (unP $ papply t 0) . W.scale2D (apply t 1)
+
+getSurfaceColour :: Style v Double -> Maybe (Colour Double)
+getSurfaceColour = view _sc
 getFillColour :: Style v Double -> Maybe (AlphaColour Double)
 getFillColour = textureToColour . getFillTexture <=< getAttr
 getLineColour :: Style v Double -> Maybe (AlphaColour Double)
@@ -111,14 +135,46 @@ textureToColour = \case
     RG _ -> Nothing
 
 toColouredPrism :: Double -> AlphaColour Double -> W.Shape -> W.Solid
-toColouredPrism d c =
+toColouredPrism d c = convertColourA c . W.prism d
+convertColourA :: AlphaColour Double -> W.Solid -> W.Solid
+convertColourA c =
     W.paintSolid
-        ( W.paintWithColour (W.Colour r g b)
+        ( colourToPaint (c `Data.Colour.over` black)
             <> W.paintWithOpacity (alphaChannel c)
         )
-        . W.prism d
+convertColour :: Colour Double -> W.Solid -> W.Solid
+convertColour = W.paintSolid . colourToPaint
+colourToPaint :: Colour Double -> W.Paint
+colourToPaint c = W.paintWithColour (W.Colour r g b)
   where
-    RGB r g b = toSRGB $ c `Data.Colour.over` black
+    RGB r g b = toSRGB c
+
+-- TODO is there a better API than parameterising the backend type and creating entire 2D Diagrams?
+-- e.g. would it be better to just make all of the primitives renderable directly in 3D?
+-- if the current approach is the way we want to go, we should at least provide helpers like:
+-- `renderWaterfall2D :: W.Font -> Double -> Diagram (Waterfall V2) -> W.Solid`
+-- TODO also is there a better name for this?
+-- it seems somewhat standard, but then there are identifers in Diagrams using that word quite differently
+-- I'd be happy to just use Prism, but that clashes with Diagrams' lens re-exports
+data Extrusion m = Extrusion (T3 Double) Double (QDiagram (Waterfall V2) V2 Double m)
+type instance V (Extrusion m) = V3
+type instance N (Extrusion m) = Double
+instance Transformable (Extrusion m) where
+    transform t (Extrusion t' z d) = Extrusion (t <> t') z d
+instance (Monoid m) => Renderable (Extrusion m) (Waterfall V3) where
+    -- TODO _sty being ignored is a bit sus
+    -- plus we entirely avoid reading the `prismLength` field when rendering straight to 3D
+    render Waterfall (Extrusion t prismLength dia) = Render \opts _sty ->
+        convertTransform t $ renderDia Waterfall opts{prismLength} dia
+extrude :: (Typeable m, Monoid m) => Double -> QDiagram (Waterfall V2) V2 Double m -> QDiagram B V3 Double m
+extrude d dia =
+    mkQD
+        (Prim $ Extrusion mempty d dia)
+        -- TODO fill envelope etc. in properly, if we're sticking with this API
+        mempty
+        mempty
+        mempty
+        (Query \(P (V3 x y z)) -> if 0 <= z && z <= d then sample dia $ P (V2 x y) else mempty)
 
 -- TODO is this equivalent to some standard recursion scheme?
 -- we can't use anything like `foldTree` as we need to pass things _down_

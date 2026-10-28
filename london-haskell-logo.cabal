@@ -37,6 +37,7 @@ executable london-haskell-logo-exe
       base >=4.7 && <5
     , colour
     , containers
+    , linear
     , diagrams-core
     , diagrams-lib
     , diagrams-svg
