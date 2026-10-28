@@ -144,8 +144,6 @@ textureToColour = \case
     LG _ -> Nothing
     RG _ -> Nothing
 
-toColouredPrism :: Double -> AlphaColour Double -> W.Shape -> W.Solid
-toColouredPrism d c = convertColourA c . W.prism d
 convertColourA :: AlphaColour Double -> W.Solid -> W.Solid
 convertColourA c =
     W.paintSolid
@@ -175,7 +173,7 @@ instance (Monoid m) => Renderable (Extrusion m) (Waterfall V3) where
     -- TODO _sty being ignored is a bit sus
     render Waterfall (Extrusion t prismLength dia) = Render \(WaterfallOptions{globalFont}) _sty ->
         convertTransform t
-            . foldMap (uncurry (flip (toColouredPrism prismLength)))
+            . foldMap (uncurry (\d c -> convertColourA c $ W.prism prismLength d))
             $ renderDia Waterfall (WaterfallOptions{globalFont}) dia
 extrude :: (Typeable m, Monoid m) => Double -> QDiagram (Waterfall V2) V2 Double m -> QDiagram B V3 Double m
 extrude d dia =
