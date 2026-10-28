@@ -11,6 +11,7 @@ module Main (main) where
 import Diagrams.Prelude hiding (font)
 import Diagrams.Prelude
 import DiagramsWaterfall
+import Linear.V3
 import Waterfall qualified as W
 
 stationCircle = joinedStations . pure
@@ -20,7 +21,11 @@ joinedStations points =
     let trail = fromVertices points
         points3D = map (\(P (V2 x y)) -> P (V3 x y 0)) points
     in  atPoints points3D (repeat (sphere # skin # scale 2 # sc white # translateZ 1))
-            <> (trail # lc white # lwG 1 # extrude 3 # translateZ -0.5)
+            <> mconcat (zipWith
+                (\a b -> let v = b .-. a in cylinder # skin # scaleZ (norm v)
+                    # transform (rotationAbout 0 (direction $ cross unitZ v) (angleBetween unitZ v))
+                    # moveTo a # sc white # translateZ 1.5
+                ) points3D (drop 1 points3D))
             <> atPoints points (repeat (circle 3 # fc black)) # extrude 2
             <> trail # lc black # lwG 3 # extrude 2
 

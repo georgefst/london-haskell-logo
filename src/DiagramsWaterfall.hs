@@ -33,8 +33,10 @@ import Data.Tree
 import Data.Typeable
 import Diagrams.Core.Compile
 import Diagrams.Prelude
+import Diagrams.Transform.Matrix
 import Diagrams.TwoD.Offset
 import Diagrams.TwoD.Text
+import Linear
 import Waterfall qualified as W
 
 -- TODO parameterise this by a monad so that we can have an optional pure renderer, and only need IO for text?
@@ -115,11 +117,10 @@ instance Renderable (Frustum Double) (Waterfall V3) where
         -- TODO handle properly (solid of revolution?), rather than assuming everything is a unit cylinder
         maybe id convertColour (getSurfaceColour sty) $ convertTransform t $ W.unitCylinder
 
--- TODO stop ignoring rotations etc.
 convertTransform :: Transformation V3 Double -> W.Solid -> W.Solid
-convertTransform t = W.translate (unP $ papply t 0) . W.scale (apply t 1)
+convertTransform t = W.translate (transl t) . W.matTransform (mkMat t <&> \(V3 x y z) -> V4 x y z 0)
 convertTransform2D :: Transformation V2 Double -> W.Shape -> W.Shape
-convertTransform2D t = W.translate2D (unP $ papply t 0) . W.scale2D (apply t 1)
+convertTransform2D t = W.translate2D (transl t) . W.matTransform2D (mkMat t <&> \(V2 x y) -> V3 x y 0)
 
 getSurfaceColour :: Style v Double -> Maybe (Colour Double)
 getSurfaceColour = view _sc
