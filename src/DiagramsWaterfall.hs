@@ -1,12 +1,15 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- TODO very WIP
 -- heavily based on my Gloss backend, as well as the SVG backend
@@ -18,7 +21,7 @@
 module DiagramsWaterfall (
     B,
     Waterfall (Waterfall),
-    Options (WaterfallOptions, globalFont, prismLength),
+    Options (WaterfallOptions, globalFont),
     extrude,
 ) where
 
@@ -48,14 +51,17 @@ type B = Waterfall V3
 type instance V (Waterfall v) = v
 type instance N (Waterfall v) = Double
 
-instance Backend (Waterfall v) v Double where
-    type Result (Waterfall v) v Double = W.Solid
+type family WaterfallResult (v :: Type -> Type) where
+    WaterfallResult V2 = [(W.Shape, AlphaColour Double)]
+    WaterfallResult V3 = W.Solid
+
+instance (Monoid (WaterfallResult v)) => Backend (Waterfall v) v Double where
+    type Result (Waterfall v) v Double = WaterfallResult v
     newtype Render (Waterfall v) v Double = Render
         { unRender :: Options (Waterfall v) v Double -> Style v Double -> Result (Waterfall v) v Double
         }
     data Options (Waterfall v) v Double = WaterfallOptions
         { globalFont :: W.Font -- TODO temporary crutch - see above about fonts and pure rendering
-        , prismLength :: Double
         }
     renderRTree Waterfall opts t =
         fold $ fmap (uncurry (flip prim)) $ mzip t $ collectParents $ fmap (fromMaybe mempty . style) t
@@ -71,18 +77,18 @@ instance Backend (Waterfall v) v Double where
 -- TODO is there a way to retain information about richer shapes, e.g. turn circles directly in to circles?
 -- probably not currently: https://github.com/diagrams/diagrams-svg/issues/121
 instance Renderable (Path V2 Double) (Waterfall V2) where
-    render Waterfall path = Render \opts sty -> mconcat do
+    render Waterfall path = Render \_ sty -> do
         trail <- pathTrails path
         guard $ not $ isTrailEmpty $ unLoc trail -- prevents segfault
         concat
-            [ maybeToList $ flip (toColouredPrism opts.prismLength) (renderLocTrail trail) <$> getFillColour sty
+            [ maybeToList $ (renderLocTrail trail,) <$> getFillColour sty
             , do
                 w <- getLineWidth <$> maybeToList (getAttr sty)
                 guard $ w > 0 -- main base case
                 c <- maybeToList $ getLineColour sty
                 -- TODO this probably isn't handling hollow shapes correctly - we'll need `W.difference2D`
                 shape <- renderLocTrail <$> pathTrails (expandTrail (w / 2) $ undegenerate trail)
-                pure $ toColouredPrism opts.prismLength c shape
+                pure (shape, c)
             ]
       where
         renderLocTrail trail =
@@ -100,7 +106,8 @@ instance Renderable (Text Double) (Waterfall V2) where
     render Waterfall (Text tt _ s) = Render \opts sty -> mconcat do
         c <- maybeToList $ getFillColour sty
         pure
-            . toColouredPrism opts.prismLength c
+            . pure
+            . (,c)
             . convertTransform2D tt
             $ W.text opts.globalFont s
 
@@ -166,9 +173,10 @@ instance Transformable (Extrusion m) where
     transform t (Extrusion t' z d) = Extrusion (t <> t') z d
 instance (Monoid m) => Renderable (Extrusion m) (Waterfall V3) where
     -- TODO _sty being ignored is a bit sus
-    -- plus we entirely avoid reading the `prismLength` field when rendering straight to 3D
-    render Waterfall (Extrusion t prismLength dia) = Render \opts _sty ->
-        convertTransform t $ renderDia Waterfall opts{prismLength} dia
+    render Waterfall (Extrusion t prismLength dia) = Render \(WaterfallOptions{globalFont}) _sty ->
+        convertTransform t
+            . foldMap (uncurry (flip (toColouredPrism prismLength)))
+            $ renderDia Waterfall (WaterfallOptions{globalFont}) dia
 extrude :: (Typeable m, Monoid m) => Double -> QDiagram (Waterfall V2) V2 Double m -> QDiagram B V3 Double m
 extrude d dia =
     mkQD

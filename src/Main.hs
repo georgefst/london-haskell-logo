@@ -96,7 +96,7 @@ main = do
     W.writeOBJ 0.1 "logo.obj" $
         renderDia
             Waterfall
-            WaterfallOptions{globalFont, prismLength = 5}
+            WaterfallOptions{globalFont}
             -- $ mconcat
             --     [ cube & skin & scale 10 & sc blue & translateX 5
             --     , cube & skin & scale 10 & sc red & translateZ -20 & translateX 5
