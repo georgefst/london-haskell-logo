@@ -148,18 +148,18 @@ textureToColour = \case
     LG _ -> Nothing
     RG _ -> Nothing
 
-convertColourA :: AlphaColour Double -> W.Solid -> W.Solid
-convertColourA c =
-    W.paintSolid
-        ( colourToPaint (c `Data.Colour.over` black)
-            <> W.paintWithOpacity (alphaChannel c)
-        )
 convertColour :: Colour Double -> W.Solid -> W.Solid
 convertColour = W.paintSolid . colourToPaint
 colourToPaint :: Colour Double -> W.Paint
 colourToPaint c = W.paintWithColour (W.Colour r g b)
   where
     RGB r g b = toSRGB c
+convertColourA :: AlphaColour Double -> W.Solid -> W.Solid
+convertColourA = W.paintSolid . colourToPaintA
+colourToPaintA :: AlphaColour Double -> W.Paint
+colourToPaintA c =
+    colourToPaint (c `Data.Colour.over` black)
+        <> W.paintWithOpacity (alphaChannel c)
 
 -- TODO is there a better API than parameterising the backend type and creating entire 2D Diagrams?
 -- e.g. would it be better to just make all of the primitives renderable directly in 3D?
