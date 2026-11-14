@@ -28,6 +28,8 @@ module DiagramsWaterfall (
 
 import Control.Monad
 import Control.Monad.Zip
+import Codec.Picture
+import Data.ByteString.Lazy qualified as BL
 import Data.Colour qualified
 import Data.Foldable
 import Data.Function
@@ -114,6 +116,17 @@ instance Renderable (Text Double) (Waterfall V2) where
             . (,colourToPaintA c)
             . convertTransform2D tt
             $ W.text opts.globalFont s
+
+-- the image is stretched over a rectangle, which Waterfall maps textures on to exactly once
+-- this means that extruding an image gives a prism with the image on every face
+-- TODO the image has no fill colour of its own, so we ignore style - should we use opacity?
+instance Renderable (DImage Double Embedded) (Waterfall V2) where
+    render Waterfall (DImage (ImageRaster img) w h t) = Render \_ _ -> case encodeDynamicPng img of
+        Left e -> error e
+        Right b -> pure
+            ( convertTransform2D t . W.scale2D (V2 (fromIntegral w) (fromIntegral h)) $ W.centeredSquare
+            , W.paintWithBaseColourTexture $ W.Texture $ BL.toStrict b
+            )
 
 -- TODO add:
 -- Path V3 Double

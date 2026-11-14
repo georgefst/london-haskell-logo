@@ -27,6 +27,8 @@ dependencies:
 - diagrams-core
 - diagrams-lib
 - diagrams-svg
+- bytestring
+- JuicyPixels
 - waterfall-cad >= 0.8
 
 ghc-options:

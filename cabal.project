@@ -1,0 +1,5 @@
+packages:
+  .
+  
+  deps/opencascade-hs/opencascade-hs
+  deps/opencascade-hs/waterfall-cad

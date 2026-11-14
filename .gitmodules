@@ -1,0 +1,4 @@
+[submodule "deps/opencascade-hs"]
+	path = deps/opencascade-hs
+	url = https://github.com/georgefst/opencascade-hs
+	branch = vibes
