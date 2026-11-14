@@ -56,7 +56,7 @@ type instance V (Waterfall v) = v
 type instance N (Waterfall v) = Double
 
 type family WaterfallResult (v :: Type -> Type) where
-    WaterfallResult V2 = [(W.Shape, AlphaColour Double)]
+    WaterfallResult V2 = [(W.Shape, W.Paint)]
     WaterfallResult V3 = W.Solid
 
 instance (Monoid (WaterfallResult v)) => Backend (Waterfall v) v Double where
@@ -85,14 +85,14 @@ instance Renderable (Path V2 Double) (Waterfall V2) where
         trail <- pathTrails path
         guard $ not $ isTrailEmpty $ unLoc trail -- prevents segfault
         concat
-            [ maybeToList $ (renderLocTrail trail,) <$> getFillColour sty
+            [ maybeToList $ (renderLocTrail trail,) . colourToPaintA <$> getFillColour sty
             , do
                 w <- getLineWidth <$> maybeToList (getAttr sty)
                 guard $ w > 0 -- main base case
                 c <- maybeToList $ getLineColour sty
                 -- TODO this probably isn't handling hollow shapes correctly - we'll need `W.difference2D`
                 shape <- renderLocTrail <$> pathTrails (expandTrail (w / 2) $ undegenerate trail)
-                pure (shape, c)
+                pure (shape, colourToPaintA c)
             ]
       where
         renderLocTrail trail =
@@ -111,7 +111,7 @@ instance Renderable (Text Double) (Waterfall V2) where
         c <- maybeToList $ getFillColour sty
         pure
             . pure
-            . (,c)
+            . (,colourToPaintA c)
             . convertTransform2D tt
             $ W.text opts.globalFont s
 
@@ -121,14 +121,14 @@ instance Renderable (Text Double) (Waterfall V2) where
 -- all other 3D shapes from https://hackage-content.haskell.org/package/diagrams-lib/docs/Diagrams-ThreeD-Shapes.html
 instance Renderable (Ellipsoid Double) (Waterfall V3) where
     render Waterfall (Ellipsoid t) = Render \_ sty ->
-        maybe id convertColour (getSurfaceColour sty) $ convertTransform t W.unitSphere
+        maybe id (W.paintSolid . colourToPaint) (getSurfaceColour sty) $ convertTransform t W.unitSphere
 instance Renderable (Box Double) (Waterfall V3) where
     render Waterfall (Box t) = Render \_ sty ->
-        maybe id convertColour (getSurfaceColour sty) $ convertTransform t $ W.box 1
+        maybe id (W.paintSolid . colourToPaint) (getSurfaceColour sty) $ convertTransform t $ W.box 1
 instance Renderable (Frustum Double) (Waterfall V3) where
     render Waterfall (Frustum _ _ t) = Render \_ sty ->
         -- TODO handle properly (solid of revolution?), rather than assuming everything is a unit cylinder
-        maybe id convertColour (getSurfaceColour sty) $ convertTransform t $ W.unitCylinder
+        maybe id (W.paintSolid . colourToPaint) (getSurfaceColour sty) $ convertTransform t $ W.unitCylinder
 
 convertTransform :: Transformation V3 Double -> W.Solid -> W.Solid
 convertTransform t = W.translate (transl t) . W.matTransform (mkMat t <&> \(V3 x y z) -> V4 x y z 0)
@@ -148,14 +148,10 @@ textureToColour = \case
     LG _ -> Nothing
     RG _ -> Nothing
 
-convertColour :: Colour Double -> W.Solid -> W.Solid
-convertColour = W.paintSolid . colourToPaint
 colourToPaint :: Colour Double -> W.Paint
 colourToPaint c = W.paintWithColour (W.Colour r g b)
   where
     RGB r g b = toSRGB c
-convertColourA :: AlphaColour Double -> W.Solid -> W.Solid
-convertColourA = W.paintSolid . colourToPaintA
 colourToPaintA :: AlphaColour Double -> W.Paint
 colourToPaintA c =
     colourToPaint (c `Data.Colour.over` black)
@@ -175,7 +171,7 @@ instance (Monoid m) => Renderable (Extrusion m) (Waterfall V3) where
     -- TODO _sty being ignored is a bit sus
     render Waterfall (Extrusion t prismLength dia) = Render \(WaterfallOptions{globalFont}) _sty ->
         convertTransform t
-            . foldMap (uncurry (\d c -> convertColourA c $ W.prism prismLength d))
+            . foldMap (uncurry (\d p -> W.paintSolid p $ W.prism prismLength d))
             $ renderDia Waterfall (WaterfallOptions{globalFont}) dia
 extrude :: (Typeable m, Monoid m) => Double -> QDiagram (Waterfall V2) V2 Double m -> QDiagram B V3 Double m
 extrude d dia =
